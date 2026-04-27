@@ -33,5 +33,16 @@ namespace Tutorial7.Controllers
             }
             return Ok(appointment);
         }
+
+        [HttpPost]
+        public async Task<IActionResult> Post([FromBody] CreateAppointmentRequestDto request)
+        {
+            var appointment = await _appointmentsService.CreateAppointment(request);
+            if (appointment == null)
+            {
+                return Conflict();
+            }
+            return Ok(appointment);
+        }
     }
 }

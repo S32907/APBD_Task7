@@ -88,4 +88,121 @@ public class AppointmentsService : IAppointmentsService
         }
         return null;
     }
+
+    public async Task<AppointmentDto> CreateAppointment(CreateAppointmentRequestDto appointment)
+    {
+        
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync();
+        
+        //businessRules
+        
+        //check if patient exist
+        await using var patientCmd = new SqlCommand(@"
+        SELECT 1 
+        FROM Patients 
+        WHERE IdPatient = @IdPatient AND IsActive = 1;
+        ", connection);
+
+        patientCmd.Parameters.Add("@IdPatient", SqlDbType.Int).Value = appointment.IdPatient;
+
+        var patientExists = await patientCmd.ExecuteScalarAsync();
+
+        if (patientExists == null)
+            return null;
+        
+        //check if doctor exists 
+        await using var doctorCmd = new SqlCommand(@"
+        SELECT 1 
+        FROM Doctors 
+        WHERE IdDoctor = @IdDoctor AND IsActive = 1;
+        ", connection);
+
+        doctorCmd.Parameters.Add("@IdDoctor", SqlDbType.Int).Value = appointment.IdDoctor;
+
+        var doctorExists = await doctorCmd.ExecuteScalarAsync();
+
+        if (doctorExists == null)
+            return null;
+        
+        //check date 
+        if (appointment.AppointmentDate < DateTime.Now)
+            return null;
+        
+        //reason validation
+        if (string.IsNullOrWhiteSpace(appointment.Reason) || appointment.Reason.Length > 250)
+            return null;
+        
+        //Doctor availability 
+        await using var conflictCmd = new SqlCommand(@"
+        SELECT 1
+        FROM Appointments
+        WHERE IdDoctor = @IdDoctor
+         AND AppointmentDate = @AppointmentDate
+        AND Status = 'Scheduled';
+        ", connection);
+
+        conflictCmd.Parameters.Add("@IdDoctor", SqlDbType.Int).Value = appointment.IdDoctor;
+        conflictCmd.Parameters.Add("@AppointmentDate", SqlDbType.DateTime).Value = appointment.AppointmentDate;
+
+        var conflict = await conflictCmd.ExecuteScalarAsync();
+
+        if (conflict != null)
+            return null;
+        
+        //inserting new appointment 
+        await using var command = new SqlCommand(@"
+        INSERT INTO dbo.Appointments
+        (IdPatient, IdDoctor, AppointmentDate, Status, Reason, InternalNotes, CreatedAt)
+        VALUES
+        (@IdPatient, @IdDoctor, @AppointmentDate, 'Scheduled', @Reason, default, @CreatedAt);
+
+        SELECT CAST(SCOPE_IDENTITY() AS int);
+        ", connection);
+        
+        command.Parameters.Add("@IdPatient", SqlDbType.Int).Value = appointment.IdPatient;
+        command.Parameters.Add("@IdDoctor", SqlDbType.Int).Value = appointment.IdDoctor;
+        command.Parameters.Add("@AppointmentDate", SqlDbType.DateTime).Value = appointment.AppointmentDate;
+        command.Parameters.Add("@Reason", SqlDbType.NVarChar).Value = appointment.Reason;
+        command.Parameters.Add("@CreatedAt", SqlDbType.DateTime).Value = DateTime.UtcNow;
+        
+        //saving its id
+        var newId = (int)await command.ExecuteScalarAsync();
+        
+        //selecting new appointment
+        await using var selectCommand = new SqlCommand(@"
+        SELECT 
+            IdAppointment,
+            IdPatient,
+            IdDoctor,
+            AppointmentDate,
+            Status,
+            Reason,
+            InternalNotes,
+            CreatedAt
+        FROM dbo.Appointments
+        WHERE IdAppointment = @IdAppointment;
+        ", connection);
+        
+        //using saved id
+        selectCommand.Parameters.Add("@IdAppointment", SqlDbType.Int).Value = newId;
+
+        await using var reader = await selectCommand.ExecuteReaderAsync();
+
+        if (await reader.ReadAsync())
+        {
+            return new AppointmentDto
+            {
+                IdAppointment = reader.GetInt32(0),
+                IdPatient = reader.GetInt32(1),
+                IdDoctor = reader.GetInt32(2),
+                AppointmentDate = reader.GetDateTime(3),
+                Status = reader.GetString(4),
+                Reason = reader.GetString(5),
+                InternalNotes = reader.IsDBNull(6) ? string.Empty : reader.GetString(6),
+                CreatedAt = reader.GetDateTime(7)
+            };
+        }
+        return null;
+    }
 }

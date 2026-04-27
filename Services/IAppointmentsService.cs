@@ -6,4 +6,5 @@ public interface IAppointmentsService
 {
     Task<IEnumerable<AppointmentListDto>> GetAllAppointmentsAsync(); 
     Task<AppointmentDto> GetAppointmentByIdAsync(int id);
+    Task<AppointmentDto> CreateAppointment(CreateAppointmentRequestDto appointment);
 }
