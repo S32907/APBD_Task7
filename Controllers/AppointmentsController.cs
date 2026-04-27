@@ -44,5 +44,18 @@ namespace Tutorial7.Controllers
             }
             return Ok(appointment);
         }
+        
+        [HttpPut("{idAppointment}")]
+        public async Task<IActionResult> UpdateAppointment(
+            int idAppointment,
+            [FromBody] UpdateAppointmentRequestDto request)
+        {
+            var result = await _appointmentsService.UpdateAppointment(idAppointment, request);
+
+            if (result == null)
+                return Conflict(); 
+
+            return Ok(result);
+        }
     }
 }
