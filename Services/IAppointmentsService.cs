@@ -4,5 +4,6 @@ namespace Tutorial7.Services;
 
 public interface IAppointmentsService
 {
-    Task<IEnumerable<AppointmentListDto>> GetAllAppointmentsAsync();
+    Task<IEnumerable<AppointmentListDto>> GetAllAppointmentsAsync(); 
+    Task<AppointmentDto> GetAppointmentByIdAsync(int id);
 }
