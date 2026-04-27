@@ -181,11 +181,12 @@ public class AppointmentsService : IAppointmentsService
     await using var connection = new SqlConnection(_connectionString);
     await connection.OpenAsync();
 
+    //businessRules
+    
     // Check if appointment exists 
     var existing = await GetAppointmentByIdAsync(id);
     if (existing == null) return null;
-
-    // Validate patient & doctor
+    
     if (!await PatientExistsAsync(connection, request.IdPatient)) return null;
     if (!await DoctorExistsAsync(connection, request.IdDoctor)) return null;
 
@@ -201,7 +202,7 @@ public class AppointmentsService : IAppointmentsService
         existing.AppointmentDate != request.AppointmentDate)
         return null;
 
-    // Check conflict ONLY if date or doctor changed
+    // Check conflict 
     if ((existing.AppointmentDate != request.AppointmentDate ||
          existing.IdDoctor != request.IdDoctor) &&
         await HasConflictExcludingSelfAsync(connection, id, request.IdDoctor, request.AppointmentDate))
